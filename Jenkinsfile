@@ -84,7 +84,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-            sh 'inspec exec /var/lib/jenkins/workspace/terraform-azure-postgres/inspec/ -t azure:// --chef-license accept-silent || terraform destroy -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -auto-approve'
+            sh 'inspec exec inspec/ -t azure:// --chef-license accept-silent || terraform destroy -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -auto-approve'
         }
       }
       stage('Destroy') {

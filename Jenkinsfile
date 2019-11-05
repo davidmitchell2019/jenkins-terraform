@@ -1,12 +1,12 @@
 pipeline {  
     agent any  
     environment {
-        /*envs for Terraform, will be jenkins secrets*/
+        /*envs for Terraform, all will be added as jenkins secrets*/
         ARM_CLIENT_ID=""
         ARM_CLIENT_SECRET=""
         ARM_SUBSCRIPTION_ID=""
         ARM_TENANT_ID=""
-        /*envs for inspec, will be jenkins secrets*/
+        /*envs for inspec*/
         AZURE_SUBSCRIPTION_ID=""
         AZURE_CLIENT_ID=""
         AZURE_CLIENT_SECRET=""
@@ -14,7 +14,7 @@ pipeline {
         /*terraform vars*/
         DATABASE_USER="postgresuser"
         DATABASE_PASSWORD=""
-        ACTION="destroy"
+        ACTION="apply"
     }
     stages { 
       stage('Azure login') {
@@ -50,7 +50,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-           sh 'terraform validate || rm -r -f *'
+           sh 'terraform validate'
         }
       }
       stage('TF Plan') {
@@ -58,7 +58,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-           sh 'terraform plan -out myplan -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD || rm -r -f *'
+           sh 'terraform plan -out myplan -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD'
         }
       }
       stage('Approval') {
@@ -76,7 +76,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-            sh 'terraform apply -auto-approve -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD || rm -f -r *'
+            sh 'terraform apply -auto-approve -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD'
         }
       }
       stage('Inspec validate') {
@@ -84,15 +84,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-            sh 'inspec exec /var/lib/jenkins/workspace/terraform-azure-postgres/inspec/ -t azure:// --chef-license accept-silent || terraform destroy -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -auto-approve '
-        }
-      }
-      stage('Azure logout') {
-        when{
-                equals expected:"apply",actual: "$ACTION"
-            }
-        steps {
-            sh 'az logout'
+            sh 'inspec exec /var/lib/jenkins/workspace/terraform-azure-postgres/inspec/ -t azure:// --chef-license accept-silent || terraform destroy -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -auto-approve'
         }
       }
       stage('Destroy') {
@@ -103,5 +95,11 @@ pipeline {
             sh 'terraform destroy -auto-approve -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD'
         }
       }
+    }
+    post {
+        always {
+            sh 'az logout || echo "logged out"'
+            deleteDir() /* clean up our workspace */
+        }
     }
 }

@@ -1,7 +1,7 @@
 pipeline {  
     agent any  
     environment {
-        /*envs for Terraform, all will be added as jenkins secrets*/
+        /*envs for Terraform*/
         ARM_CLIENT_ID=""
         ARM_CLIENT_SECRET=""
         ARM_SUBSCRIPTION_ID=""
@@ -14,7 +14,12 @@ pipeline {
         /*terraform vars*/
         DATABASE_USER="postgresuser"
         DATABASE_PASSWORD=""
+        /*Build action*/
         ACTION="apply"
+        /*inspec variables*/
+        RESOURCE_GROUP=""
+        SERVER_NAME=""
+        
     }
     stages { 
       stage('Azure login') {
@@ -84,7 +89,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-            sh 'inspec exec inspec/ -t azure:// --chef-license accept-silent || terraform destroy -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -auto-approve'
+            sh 'inspec exec inspec -t azure:// --input resource_group=$RESOURCE_GROUP server_name=$SERVER_NAME --chef-license accept-silent || terraform destroy -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -auto-approve'
         }
       }
       stage('Destroy') {

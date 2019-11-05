@@ -63,7 +63,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-           sh 'terraform plan -out myplan -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD'
+           sh 'terraform plan -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD'
         }
       }
       stage('Approval') {

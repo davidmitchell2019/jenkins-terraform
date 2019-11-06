@@ -14,26 +14,35 @@ pipeline {
         /*terraform vars*/
         DATABASE_USER="postgresuser"
         DATABASE_PASSWORD=""
-        /*Build action*/
         ACTION="apply"
-        /*inspec variables*/
         RESOURCE_GROUP=""
         SERVER_NAME=""
-        
-    }
+        /*Azure vars*/
+        AZURESTORAGEACCOUNT=""
+        AZURESTORAGECONTAINER=""
+        }
     stages { 
       stage('Azure login') {
-        when{
-                equals expected:"apply",actual: "$ACTION"
-        }
         steps {
             sh 'az login --service-principal --username $ARM_CLIENT_ID --password $ARM_CLIENT_SECRET --tenant $ARM_TENANT_ID'
         }
       }
+      stage('Create Azure Resource group') {
+        steps {
+            sh 'az group create --location UKSouth --name $RESOURCE_GROUP || echo "rg already created"'
+        }
+      }
+      stage('Create Azure storage account') {
+        steps {
+            sh 'az storage account create --name $AZURESTORAGEACCOUNT --resource-group $RESOURCE_GROUP || echo "account already created"'
+        }
+      }
+      stage('Create Azure storage container') {
+        steps {
+            sh 'az storage container create --name $AZURESTORAGECONTAINER --connection-string "$(az storage account show-connection-string -n $AZURESTORAGEACCOUNT -g $RESOURCE_GROUP --key primary)" || echo "container already created"'
+        }
+      }
       stage('Checkout') {
-        when{
-                equals expected:"apply",actual: "$ACTION"
-            }
         steps {
           git(
             url: 'https://github.com/davidmitchell2019/azuresql.git',
@@ -47,7 +56,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-           sh 'terraform init'
+           sh 'terraform init -backend-config="resource_group_name=$RESOURCE_GROUP" -backend-config="storage_account_name=$AZURESTORAGEACCOUNT" -backend-config="container_name=$AZURESTORAGECONTAINER" '
         }
       }
       stage('TF Validate') {
@@ -63,7 +72,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-           sh 'terraform plan -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD'
+           sh 'terraform plan -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -var resource_group_name=$RESOURCE_GROUP -var storage_account_name=$AZURESTORAGEACCOUNT -var storage_container_name=$AZURESTORAGECONTAINER'
         }
       }
       stage('Approval') {
@@ -81,7 +90,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-            sh 'terraform apply -auto-approve -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD'
+            sh 'terraform apply -auto-approve -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -var resource_group_name=$RESOURCE_GROUP -var storage_account_name=$AZURESTORAGEACCOUNT -var storage_container_name=$AZURESTORAGECONTAINER'
         }
       }
       stage('Inspec validate') {
@@ -89,7 +98,7 @@ pipeline {
                 equals expected:"apply",actual: "$ACTION"
             }
         steps {
-            sh 'inspec exec inspec -t azure:// --input resource_group=$RESOURCE_GROUP server_name=$SERVER_NAME --chef-license accept-silent || terraform destroy -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -auto-approve'
+            sh 'inspec exec inspec -t azure:// --input resource_group=$RESOURCE_GROUP server_name=$SERVER_NAME --chef-license accept-silent || terraform destroy -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -var resource_group_name=$RESOURCE_GROUP -var storage_account_name=$AZURESTORAGEACCOUNT -var storage_container_name=$AZURESTORAGECONTAINER -auto-approve'
         }
       }
       stage('Destroy') {
@@ -97,7 +106,7 @@ pipeline {
                 equals expected:"destroy",actual: "$ACTION"
             }
         steps {
-            sh 'terraform destroy -auto-approve -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD'
+            sh 'terraform destroy -auto-approve -var database-login=$DATABASE_USER -var database-password=$DATABASE_PASSWORD -var resource_group_name=$RESOURCE_GROUP -var storage_account_name=$AZURESTORAGEACCOUNT -var storage_container_name=$AZURESTORAGECONTAINER'
         }
       }
     }
